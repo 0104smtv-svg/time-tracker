@@ -27,17 +27,43 @@
     background: var(--bg);
     color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    padding: env(safe-area-inset-top, 0) 16px env(safe-area-inset-bottom, 0);
-  }
-  main {
-    min-height: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 18px;
-    padding: 20px 0 64px;
+    padding-top: env(safe-area-inset-top, 0);
   }
+  .view {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px;
+  }
+  .view.active { display: flex; }
+  #viewTrack { justify-content: center; gap: 22px; }
+  #viewStats { justify-content: flex-start; gap: 18px; padding-top: 28px; }
+  #info { text-align: center; padding: 6px 16px 10px; }
+  #tabs {
+    display: flex;
+    border-top: 1px solid #262e35;
+    background: #171c21;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  #tabs button {
+    flex: 1;
+    padding: 15px 0 14px;
+    background: none;
+    border: 0;
+    border-top: 3px solid transparent;
+    margin-top: -1px;
+    color: var(--muted);
+    font: inherit;
+    font-size: .95rem;
+    cursor: pointer;
+  }
+  #tabs button[aria-selected="true"] { color: var(--text); font-weight: 600; border-top-color: var(--green); }
+  #tabs button:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
   #status { font-size: 1.25rem; font-weight: 600; text-align: center; }
   #btn {
     width: min(62vw, 260px);
@@ -61,6 +87,7 @@
   }
   #btn:disabled { opacity: .65; }
   #timer { font-size: 2.6rem; font-variant-numeric: tabular-nums; font-weight: 300; min-height: 1.2em; }
+  #todayLine { color: var(--muted); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
   #stats {
     width: min(92vw, 420px);
     background: #1a2025;
@@ -84,19 +111,18 @@
   #stats .days { color: var(--muted); font-size: .85rem; text-align: right; }
   #sync { color: var(--muted); font-size: .9rem; min-height: 1.2em; text-align: center; }
   #sync.pending { color: var(--amber); }
-  #note { font-size: .95rem; min-height: 1.2em; max-width: 30em; text-align: center; color: var(--amber); }
+  #note { font-size: .95rem; min-height: 1.2em; max-width: 30em; margin: 0 auto; text-align: center; color: var(--amber); }
   #note.error { color: var(--red); }
   #settingsBtn {
-    position: fixed;
-    right: 12px;
-    bottom: calc(10px + env(safe-area-inset-bottom, 0));
     background: none;
     border: 0;
     color: var(--muted);
     font: inherit;
     font-size: .9rem;
-    padding: 10px;
+    padding: 12px;
+    margin-top: 6px;
     text-decoration: underline;
+    cursor: pointer;
   }
   dialog {
     background: #1d2329;
@@ -133,15 +159,27 @@
 </style>
 </head>
 <body>
-<main>
+<main id="viewTrack" class="view active" role="tabpanel" aria-labelledby="tabTrack">
   <div id="status"></div>
   <button id="btn" type="button"></button>
   <div id="timer"></div>
-  <section id="stats" aria-label="Статистика"></section>
+  <div id="todayLine"></div>
+</main>
+
+<section id="viewStats" class="view" role="tabpanel" aria-labelledby="tabStats">
+  <div id="stats" aria-label="Статистика"></div>
+  <button id="settingsBtn" type="button">Налаштування</button>
+</section>
+
+<div id="info">
   <div id="sync"></div>
   <div id="note" role="status"></div>
-</main>
-<button id="settingsBtn" type="button">Налаштування</button>
+</div>
+
+<nav id="tabs" role="tablist">
+  <button id="tabTrack" type="button" role="tab" aria-selected="true">Облік</button>
+  <button id="tabStats" type="button" role="tab" aria-selected="false">Статистика</button>
+</nav>
 
 <dialog id="dlg">
   <h2>Підключення до таблиці</h2>
@@ -163,7 +201,7 @@
   const LS = { cfg: 'wt_cfg', state: 'wt_state', queue: 'wt_queue', shifts: 'wt_shifts' };
   const $ = id => document.getElementById(id);
   const btn = $('btn'), statusEl = $('status'), timerEl = $('timer'), statsEl = $('stats');
-  const syncEl = $('sync'), noteEl = $('note'), dlg = $('dlg');
+  const syncEl = $('sync'), noteEl = $('note'), dlg = $('dlg'), todayLineEl = $('todayLine');
 
   const NOTES = {
     already_open: 'У таблиці вже була відкрита зміна — перевір колонку «Кінець» у листі «Лог».',
@@ -271,7 +309,9 @@
   }
 
   function renderStats() {
-    statsEl.innerHTML = computeStats().map(p =>
+    const periods = computeStats();
+    todayLineEl.textContent = 'Сьогодні: ' + fmt(periods[0].ms);
+    statsEl.innerHTML = periods.map(p =>
       '<div class="row' + (p.id === 'today' ? ' main' : '') + '">' +
         '<div class="lbl">' + p.label + (p.hint ? '<small>' + p.hint + '</small>' : '') + '</div>' +
         '<div class="val">' + fmt(p.ms) + '</div>' +
@@ -399,6 +439,17 @@
     render();
     sync();
   });
+
+  // ---------- Вкладки ----------
+  function showTab(name) {
+    const isTrack = name === 'track';
+    $('viewTrack').classList.toggle('active', isTrack);
+    $('viewStats').classList.toggle('active', !isTrack);
+    $('tabTrack').setAttribute('aria-selected', String(isTrack));
+    $('tabStats').setAttribute('aria-selected', String(!isTrack));
+  }
+  $('tabTrack').addEventListener('click', () => showTab('track'));
+  $('tabStats').addEventListener('click', () => showTab('stats'));
 
   // ---------- Налаштування ----------
   function openSettings() {
