@@ -35,11 +35,12 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 24px;
+    gap: 18px;
+    padding: 20px 0 64px;
   }
   #status { font-size: 1.25rem; font-weight: 600; text-align: center; }
   #btn {
-    width: min(72vw, 320px);
+    width: min(62vw, 260px);
     aspect-ratio: 1;
     border: 0;
     border-radius: 50%;
@@ -60,7 +61,27 @@
   }
   #btn:disabled { opacity: .65; }
   #timer { font-size: 2.6rem; font-variant-numeric: tabular-nums; font-weight: 300; min-height: 1.2em; }
-  #today { color: var(--muted); font-size: 1rem; font-variant-numeric: tabular-nums; }
+  #stats {
+    width: min(92vw, 420px);
+    background: #1a2025;
+    border: 1px solid #262e35;
+    border-radius: 14px;
+    padding: 2px 16px;
+  }
+  #stats .row {
+    display: grid;
+    grid-template-columns: 1fr auto 4.6em;
+    gap: 10px;
+    align-items: baseline;
+    padding: 11px 0;
+    border-bottom: 1px solid #242c33;
+  }
+  #stats .row:last-child { border-bottom: 0; }
+  #stats .lbl { font-size: .95rem; }
+  #stats .lbl small { display: block; color: var(--muted); font-size: .75rem; margin-top: 1px; }
+  #stats .val { font-size: 1.1rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+  #stats .row.main .val { font-size: 1.3rem; }
+  #stats .days { color: var(--muted); font-size: .85rem; text-align: right; }
   #sync { color: var(--muted); font-size: .9rem; min-height: 1.2em; text-align: center; }
   #sync.pending { color: var(--amber); }
   #note { font-size: .95rem; min-height: 1.2em; max-width: 30em; text-align: center; color: var(--amber); }
@@ -116,7 +137,7 @@
   <div id="status"></div>
   <button id="btn" type="button"></button>
   <div id="timer"></div>
-  <div id="today"></div>
+  <section id="stats" aria-label="Статистика"></section>
   <div id="sync"></div>
   <div id="note" role="status"></div>
 </main>
@@ -139,9 +160,9 @@
 (function () {
   'use strict';
 
-  const LS = { cfg: 'wt_cfg', state: 'wt_state', queue: 'wt_queue', today: 'wt_today' };
+  const LS = { cfg: 'wt_cfg', state: 'wt_state', queue: 'wt_queue', shifts: 'wt_shifts' };
   const $ = id => document.getElementById(id);
-  const btn = $('btn'), statusEl = $('status'), timerEl = $('timer'), todayEl = $('today');
+  const btn = $('btn'), statusEl = $('status'), timerEl = $('timer'), statsEl = $('stats');
   const syncEl = $('sync'), noteEl = $('note'), dlg = $('dlg');
 
   const NOTES = {
@@ -181,26 +202,98 @@
   let cfg = load(LS.cfg, null);
   let state = load(LS.state, { working: false, startedAt: null });
   let queue = load(LS.queue, []);
-  let today = load(LS.today, { day: dayKey(), ms: 0 });
+  let shifts = load(LS.shifts, []); // зміни з сервера: [{ s: початок_мс, e: кінець_мс | null }]
   let syncing = false;
   let lastTap = 0;
 
-  function getToday() {
-    if (today.day !== dayKey()) today = { day: dayKey(), ms: 0 };
-    return today;
+  const MONTHS = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня',
+                  'вересня', 'жовтня', 'листопада', 'грудня'];
+  const MONTHS_NOM = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень',
+                      'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
+
+  function keyOf(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function hhmm(ms) {
+    const d = new Date(ms);
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function dayWord(n) {
+    const a = n % 10, b = n % 100;
+    if (a === 1 && b !== 11) return 'день';
+    if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return 'дні';
+    return 'днів';
+  }
+
+  // Зміни з сервера + ще не відправлені події з черги (щоб офлайн-статистика була актуальною)
+  function currentShifts() {
+    const list = shifts.map(x => ({ s: x.s, e: x.e }));
+    let open = list.length && list[list.length - 1].e == null ? list[list.length - 1] : null;
+    queue.forEach(ev => {
+      if (ev.type === 'in') {
+        if (!open) { open = { s: ev.ts, e: null }; list.push(open); }
+      } else if (open && ev.ts >= open.s) {
+        open.e = ev.ts;
+        open = null;
+      }
+    });
+    return list;
+  }
+
+  function computeStats() {
+    const now = new Date();
+    const nowMs = now.getTime();
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const back = (now.getDay() + 6) % 7; // тиждень починається з понеділка
+    const monday = new Date(y, m, d - back);
+    const sunday = new Date(y, m, d - back + 6);
+    const mk = day => y + '-' + pad(m + 1) + '-' + pad(day);
+    const short = dt => pad(dt.getDate()) + '.' + pad(dt.getMonth() + 1);
+
+    const periods = [
+      { id: 'today', label: 'Сьогодні', from: keyOf(now), to: keyOf(now) },
+      { id: 'week', label: 'Тиждень', hint: short(monday) + ' – ' + short(sunday), from: keyOf(monday), to: keyOf(sunday) },
+      { id: 'h1', label: '1–15 ' + MONTHS[m], from: mk(1), to: mk(15) }
+    ];
+    if (d >= 16) periods.push({ id: 'h2', label: '16–' + lastDay + ' ' + MONTHS[m], from: mk(16), to: mk(lastDay) });
+    periods.push({ id: 'month', label: MONTHS_NOM[m], hint: String(y), from: mk(1), to: mk(lastDay) });
+    periods.forEach(p => { p.ms = 0; p.days = new Set(); });
+
+    currentShifts().forEach(sh => {
+      const key = keyOf(new Date(sh.s)); // зміна належить дню, коли вона почалась
+      const dur = Math.max(0, (sh.e == null ? nowMs : sh.e) - sh.s);
+      periods.forEach(p => {
+        if (key >= p.from && key <= p.to) { p.ms += dur; p.days.add(key); }
+      });
+    });
+    return periods;
+  }
+
+  function renderStats() {
+    statsEl.innerHTML = computeStats().map(p =>
+      '<div class="row' + (p.id === 'today' ? ' main' : '') + '">' +
+        '<div class="lbl">' + p.label + (p.hint ? '<small>' + p.hint + '</small>' : '') + '</div>' +
+        '<div class="val">' + fmt(p.ms) + '</div>' +
+        '<div class="days">' + p.days.size + ' ' + dayWord(p.days.size) + '</div>' +
+      '</div>'
+    ).join('');
   }
 
   // ---------- Відображення ----------
   function render() {
     btn.classList.toggle('working', state.working);
     btn.textContent = state.working ? 'Піти з роботи' : 'Прийшов на роботу';
-    statusEl.textContent = state.working ? 'Ти на роботі' : 'Ти не на роботі';
-    todayEl.textContent = 'Сьогодні закрито: ' + fmt(getToday().ms);
+    statusEl.textContent = state.working && state.startedAt
+      ? 'Ти на роботі з ' + hhmm(state.startedAt)
+      : (state.working ? 'Ти на роботі' : 'Ти не на роботі');
+    renderStats();
     renderTimer();
     renderSync();
   }
   function renderTimer() {
     timerEl.textContent = state.working && state.startedAt ? fmt(Date.now() - state.startedAt) : '';
+    if (state.working) renderStats(); // поточна зміна «тікає» в статистиці
   }
   function renderSync() {
     let text, pending = false;
@@ -251,9 +344,9 @@
   function applyServer(s) {
     if (queue.length) return; // є непереслані дії — локальний стан важливіший
     state = { working: !!s.working, startedAt: s.startedAt || null };
-    today = { day: dayKey(), ms: Math.round((s.todayHours || 0) * 3600000) };
+    shifts = (s.shifts || []).map(x => ({ s: x[0], e: x[1] || null }));
     save(LS.state, state);
-    save(LS.today, today);
+    save(LS.shifts, shifts);
     render();
   }
 
@@ -297,15 +390,11 @@
     if (ev.type === 'in') {
       state = { working: true, startedAt: now };
     } else {
-      const t = getToday();
-      if (state.startedAt) t.ms += now - state.startedAt;
-      today = t;
       state = { working: false, startedAt: null };
     }
     queue.push(ev);
     save(LS.queue, queue);
     save(LS.state, state);
-    save(LS.today, today);
     note('');
     render();
     sync();
