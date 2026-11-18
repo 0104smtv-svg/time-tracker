@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14181c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Час">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Облік часу</title>
+<style>
+  :root {
+    --bg: #14181c;
+    --text: #e9edf0;
+    --muted: #8b969f;
+    --green: #2fb36a;
+    --red: #e5483f;
+    --amber: #e0a73a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top, 0) 16px env(safe-area-inset-bottom, 0);
+  }
+  main {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+  #status { font-size: 1.25rem; font-weight: 600; text-align: center; }
+  #btn {
+    width: min(72vw, 320px);
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 50%;
+    background: var(--green);
+    color: #fff;
+    font: inherit;
+    font-size: 1.5rem;
+    font-weight: 700;
+    box-shadow: 0 0 0 10px rgba(47, 179, 106, .18), 0 14px 40px rgba(0, 0, 0, .45);
+    transition: background .25s, box-shadow .25s, transform .1s, opacity .2s;
+    cursor: pointer;
+  }
+  #btn:active { transform: scale(.96); }
+  #btn:focus-visible { outline: 3px solid #fff; outline-offset: 6px; }
+  #btn.working {
+    background: var(--red);
+    box-shadow: 0 0 0 10px rgba(229, 72, 63, .18), 0 14px 40px rgba(0, 0, 0, .45);
+  }
+  #btn:disabled { opacity: .65; }
+  #timer { font-size: 2.6rem; font-variant-numeric: tabular-nums; font-weight: 300; min-height: 1.2em; }
+  #today { color: var(--muted); font-size: 1rem; font-variant-numeric: tabular-nums; }
+  #sync { color: var(--muted); font-size: .9rem; min-height: 1.2em; text-align: center; }
+  #sync.pending { color: var(--amber); }
+  #note { font-size: .95rem; min-height: 1.2em; max-width: 30em; text-align: center; color: var(--amber); }
+  #note.error { color: var(--red); }
+  #settingsBtn {
+    position: fixed;
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0));
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font: inherit;
+    font-size: .9rem;
+    padding: 10px;
+    text-decoration: underline;
+  }
+  dialog {
+    background: #1d2329;
+    color: var(--text);
+    border: 1px solid #2c353d;
+    border-radius: 14px;
+    width: min(92vw, 420px);
+    padding: 20px;
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, .6); }
+  dialog h2 { margin: 0 0 14px; font-size: 1.15rem; }
+  dialog label { display: block; margin: 12px 0 4px; font-size: .9rem; color: var(--muted); }
+  dialog input {
+    width: 100%;
+    padding: 11px 12px;
+    border-radius: 8px;
+    border: 1px solid #3a454e;
+    background: #14181c;
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+  }
+  dialog .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  dialog button {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid #3a454e;
+    background: #29323a;
+    color: var(--text);
+    font: inherit;
+  }
+  dialog button.primary { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
+  #cfgError { color: var(--red); font-size: .9rem; min-height: 1.2em; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status"></div>
+  <button id="btn" type="button"></button>
+  <div id="timer"></div>
+  <div id="today"></div>
+  <div id="sync"></div>
+  <div id="note" role="status"></div>
+</main>
+<button id="settingsBtn" type="button">Налаштування</button>
+
+<dialog id="dlg">
+  <h2>Підключення до таблиці</h2>
+  <label for="cfgUrl">Адреса веб-застосунку (…/exec)</label>
+  <input id="cfgUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+  <label for="cfgToken">Токен</label>
+  <input id="cfgToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div id="cfgError"></div>
+  <div class="row">
+    <button id="cfgCancel" type="button">Скасувати</button>
+    <button id="cfgSave" type="button" class="primary">Зберегти</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  'use strict';
+
+  const LS = { cfg: 'wt_cfg', state: 'wt_state', queue: 'wt_queue', today: 'wt_today' };
+  const $ = id => document.getElementById(id);
+  const btn = $('btn'), statusEl = $('status'), timerEl = $('timer'), todayEl = $('today');
+  const syncEl = $('sync'), noteEl = $('note'), dlg = $('dlg');
+
+  const NOTES = {
+    already_open: 'У таблиці вже була відкрита зміна — перевір колонку «Кінець» у листі «Лог».',
+    no_open_shift: 'У таблиці немає відкритої зміни, тому «Кінець» не записано. Перевір лист «Лог».',
+    out_before_start: 'Час завершення раніше за початок — подію не записано. Перевір лист «Лог».',
+    bad_time: 'Час події в майбутньому — подію не записано. Перевір годинник телефона.',
+    bad_event: 'Сервер відхилив подію як некоректну.'
+  };
+  const ERRORS = {
+    auth: 'Невірний токен. Відкрий «Налаштування» і перевір його.',
+    token_not_set: 'У Code.gs не змінено TOKEN.',
+    bad_request: 'Сервер не зрозумів запит.'
+  };
+
+  function load(key, def) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? def : v; }
+    catch (e) { return def; }
+  }
+  function save(key, v) {
+    try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* сховище недоступне */ }
+  }
+  const pad = n => String(n).padStart(2, '0');
+  function dayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function fmt(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return pad(Math.floor(s / 3600)) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60);
+  }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
+
+  let cfg = load(LS.cfg, null);
+  let state = load(LS.state, { working: false, startedAt: null });
+  let queue = load(LS.queue, []);
+  let today = load(LS.today, { day: dayKey(), ms: 0 });
+  let syncing = false;
+  let lastTap = 0;
+
+  function getToday() {
+    if (today.day !== dayKey()) today = { day: dayKey(), ms: 0 };
+    return today;
+  }
+
+  // ---------- Відображення ----------
+  function render() {
+    btn.classList.toggle('working', state.working);
+    btn.textContent = state.working ? 'Піти з роботи' : 'Прийшов на роботу';
+    statusEl.textContent = state.working ? 'Ти на роботі' : 'Ти не на роботі';
+    todayEl.textContent = 'Сьогодні закрито: ' + fmt(getToday().ms);
+    renderTimer();
+    renderSync();
+  }
+  function renderTimer() {
+    timerEl.textContent = state.working && state.startedAt ? fmt(Date.now() - state.startedAt) : '';
+  }
+  function renderSync() {
+    let text, pending = false;
+    if (!cfg) { text = 'Застосунок не підключено до таблиці'; pending = true; }
+    else if (queue.length) {
+      text = 'Очікує відправки: ' + queue.length + (navigator.onLine ? '' : ' · немає мережі');
+      pending = true;
+    }
+    else if (syncing) text = 'Синхронізація…';
+    else text = navigator.onLine ? 'Синхронізовано' : 'Немає мережі';
+    syncEl.textContent = text;
+    syncEl.classList.toggle('pending', pending);
+  }
+  function note(text, isError) {
+    noteEl.textContent = text || '';
+    noteEl.classList.toggle('error', !!isError);
+  }
+
+  // ---------- Мережа ----------
+  async function post(body) {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 25000);
+    let res;
+    try {
+      res = await fetch(cfg.url, {
+        method: 'POST',
+        // text/plain — «простий» запит без preflight, інакше Apps Script його не прийме
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ token: cfg.token }, body)),
+        signal: ctrl.signal
+      });
+    } catch (e) {
+      const err = new Error('network');
+      err.network = true;
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+    let data;
+    try { data = await res.json(); }
+    catch (e) {
+      throw new Error('Сервер повернув некоректну відповідь. Перевір адресу та те, що доступ у розгортанні — «Усі».');
+    }
+    if (!data.ok) throw new Error(ERRORS[data.error] || 'Помилка сервера: ' + data.error);
+    return data;
+  }
+
+  function applyServer(s) {
+    if (queue.length) return; // є непереслані дії — локальний стан важливіший
+    state = { working: !!s.working, startedAt: s.startedAt || null };
+    today = { day: dayKey(), ms: Math.round((s.todayHours || 0) * 3600000) };
+    save(LS.state, state);
+    save(LS.today, today);
+    render();
+  }
+
+  async function sync() {
+    if (syncing || !cfg) return;
+    syncing = true;
+    renderSync();
+    let clean = false;
+    try {
+      while (queue.length) {
+        const ev = queue[0];
+        const data = await post({ action: 'event', id: ev.id, type: ev.type, ts: ev.ts });
+        queue.shift();
+        save(LS.queue, queue);
+        if (NOTES[data.result]) note(NOTES[data.result], false);
+        renderSync();
+      }
+      const data = await post({ action: 'state' });
+      applyServer(data.state);
+      clean = true;
+    } catch (e) {
+      if (!e.network) note(e.message, true);
+    } finally {
+      syncing = false;
+      renderSync();
+      if (clean && queue.length) setTimeout(sync, 200); // нажали, поки йшла синхронізація
+    }
+  }
+
+  // ---------- Дії ----------
+  btn.addEventListener('click', () => {
+    if (!cfg) { openSettings(); return; }
+    const now = Date.now();
+    if (now - lastTap < 2000) return; // захист від випадкового подвійного дотику
+    lastTap = now;
+    btn.disabled = true;
+    setTimeout(() => { btn.disabled = false; }, 2000);
+    if (navigator.vibrate) navigator.vibrate(40);
+
+    const ev = { id: uuid(), type: state.working ? 'out' : 'in', ts: now };
+    if (ev.type === 'in') {
+      state = { working: true, startedAt: now };
+    } else {
+      const t = getToday();
+      if (state.startedAt) t.ms += now - state.startedAt;
+      today = t;
+      state = { working: false, startedAt: null };
+    }
+    queue.push(ev);
+    save(LS.queue, queue);
+    save(LS.state, state);
+    save(LS.today, today);
+    note('');
+    render();
+    sync();
+  });
+
+  // ---------- Налаштування ----------
+  function openSettings() {
+    $('cfgUrl').value = cfg ? cfg.url : '';
+    $('cfgToken').value = cfg ? cfg.token : '';
+    $('cfgError').textContent = '';
+    dlg.showModal();
+  }
+  $('settingsBtn').addEventListener('click', openSettings);
+  $('cfgCancel').addEventListener('click', () => dlg.close());
+  $('cfgSave').addEventListener('click', () => {
+    const url = $('cfgUrl').value.trim();
+    const token = $('cfgToken').value.trim();
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)) {
+      $('cfgError').textContent = 'Адреса має мати вигляд https://script.google.com/macros/s/…/exec';
+      return;
+    }
+    if (!token) { $('cfgError').textContent = 'Введи токен.'; return; }
+    cfg = { url: url, token: token };
+    save(LS.cfg, cfg);
+    note('');
+    dlg.close();
+    render();
+    sync();
+  });
+
+  // ---------- Запуск ----------
+  window.addEventListener('online', () => { renderSync(); sync(); });
+  window.addEventListener('offline', renderSync);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { render(); sync(); }
+  });
+  setInterval(renderTimer, 1000);
+  setInterval(() => { if (queue.length) sync(); }, 30000);
+
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+  render();
+  if (!cfg) openSettings(); else sync();
+})();
+</script>
+</body>
+</html>
