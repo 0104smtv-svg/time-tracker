@@ -197,14 +197,15 @@
     font: inherit;
     font-size: 1rem;
   }
-  dialog .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  dialog .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 18px; }
   dialog button {
-    padding: 10px 16px;
+    padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid #3a454e;
     background: #29323a;
     color: var(--text);
     font: inherit;
+    font-size: .88rem;
     cursor: pointer;
   }
   dialog button.primary { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
