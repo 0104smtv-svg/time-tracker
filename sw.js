@@ -1,7 +1,7 @@
 // Кешує файли застосунку, щоб він відкривався без мережі.
 // Запити до Google (Apps Script) service worker не чіпає.
 // Після зміни файлів збільшуй номер версії кешу.
-const CACHE = 'wt-v3';
+const CACHE = 'wt-v4';
 const ASSETS = [
   './',
   './index.html',
