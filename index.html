@@ -14,7 +14,10 @@
 <title>Облік часу</title>
 <style>
   :root {
+    color-scheme: dark;
     --bg: #14181c;
+    --card: #1a2025;
+    --line: #262e35;
     --text: #e9edf0;
     --muted: #8b969f;
     --green: #2fb36a;
@@ -22,6 +25,7 @@
     --amber: #e0a73a;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--bg);
@@ -31,6 +35,8 @@
     flex-direction: column;
     padding-top: env(safe-area-inset-top, 0);
   }
+
+  /* ---------- Вкладки ---------- */
   .view {
     flex: 1;
     min-height: 0;
@@ -40,13 +46,14 @@
     align-items: center;
     padding: 20px 16px;
   }
+  .view > * { flex-shrink: 0; }
   .view.active { display: flex; }
   #viewTrack { justify-content: center; gap: 22px; }
-  #viewStats { justify-content: flex-start; gap: 18px; padding-top: 28px; }
+  #viewStats { justify-content: flex-start; gap: 16px; padding-top: 24px; }
   #info { text-align: center; padding: 6px 16px 10px; }
   #tabs {
     display: flex;
-    border-top: 1px solid #262e35;
+    border-top: 1px solid var(--line);
     background: #171c21;
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
@@ -64,6 +71,8 @@
   }
   #tabs button[aria-selected="true"] { color: var(--text); font-weight: 600; border-top-color: var(--green); }
   #tabs button:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
+
+  /* ---------- Головний екран ---------- */
   #status { font-size: 1.25rem; font-weight: 600; text-align: center; }
   #btn {
     width: min(62vw, 260px);
@@ -88,13 +97,19 @@
   #btn:disabled { opacity: .65; }
   #timer { font-size: 2.6rem; font-variant-numeric: tabular-nums; font-weight: 300; min-height: 1.2em; }
   #todayLine { color: var(--muted); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-  #stats {
+  #sync { color: var(--muted); font-size: .9rem; min-height: 1.2em; text-align: center; }
+  #sync.pending { color: var(--amber); }
+  #note { font-size: .95rem; min-height: 1.2em; max-width: 30em; margin: 0 auto; text-align: center; color: var(--amber); }
+  #note.error { color: var(--red); }
+
+  /* ---------- Статистика ---------- */
+  #stats, #calCard {
     width: min(92vw, 420px);
-    background: #1a2025;
-    border: 1px solid #262e35;
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 14px;
-    padding: 2px 16px;
   }
+  #stats { padding: 2px 16px; }
   #stats .row {
     display: grid;
     grid-template-columns: 1fr auto 4.6em;
@@ -106,13 +121,48 @@
   #stats .row:last-child { border-bottom: 0; }
   #stats .lbl { font-size: .95rem; }
   #stats .lbl small { display: block; color: var(--muted); font-size: .75rem; margin-top: 1px; }
-  #stats .val { font-size: 1.1rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+  #stats .val { font-size: 1.1rem; font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
   #stats .row.main .val { font-size: 1.3rem; }
+  #stats .val small { display: block; color: var(--muted); font-size: .75rem; font-weight: 400; margin-top: 1px; }
   #stats .days { color: var(--muted); font-size: .85rem; text-align: right; }
-  #sync { color: var(--muted); font-size: .9rem; min-height: 1.2em; text-align: center; }
-  #sync.pending { color: var(--amber); }
-  #note { font-size: .95rem; min-height: 1.2em; max-width: 30em; margin: 0 auto; text-align: center; color: var(--amber); }
-  #note.error { color: var(--red); }
+
+  #calCard { padding: 12px; }
+  #calHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  #calHead button {
+    background: none;
+    border: 0;
+    color: var(--text);
+    font: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 6px 16px;
+    cursor: pointer;
+  }
+  #calHead button:disabled { color: #3a454e; cursor: default; }
+  #calTitle { font-weight: 600; }
+  #calGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .wd { text-align: center; color: var(--muted); font-size: .72rem; padding: 2px 0 4px; }
+  .day {
+    aspect-ratio: 1 / 1.05;
+    border-radius: 8px;
+    border: 0;
+    background: #20272d;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    font: inherit;
+    padding: 0;
+    cursor: pointer;
+  }
+  .day .n { font-size: .78rem; opacity: .85; }
+  .day .h { font-size: .7rem; font-variant-numeric: tabular-nums; font-weight: 600; min-height: .9em; }
+  .day.blank { background: none; pointer-events: none; }
+  .day.today { box-shadow: inset 0 0 0 2px #fff; }
+  .day:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+  #calSummary { margin-top: 10px; text-align: center; color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
   #settingsBtn {
     background: none;
     border: 0;
@@ -120,27 +170,29 @@
     font: inherit;
     font-size: .9rem;
     padding: 12px;
-    margin-top: 6px;
     text-decoration: underline;
     cursor: pointer;
   }
+
+  /* ---------- Діалоги ---------- */
   dialog {
     background: #1d2329;
     color: var(--text);
     border: 1px solid #2c353d;
     border-radius: 14px;
     width: min(92vw, 420px);
+    max-height: 88vh;
     padding: 20px;
   }
   dialog::backdrop { background: rgba(0, 0, 0, .6); }
-  dialog h2 { margin: 0 0 14px; font-size: 1.15rem; }
+  dialog h2 { margin: 0 0 14px; font-size: 1.15rem; text-transform: capitalize; }
   dialog label { display: block; margin: 12px 0 4px; font-size: .9rem; color: var(--muted); }
   dialog input {
     width: 100%;
     padding: 11px 12px;
     border-radius: 8px;
     border: 1px solid #3a454e;
-    background: #14181c;
+    background: var(--bg);
     color: var(--text);
     font: inherit;
     font-size: 1rem;
@@ -153,12 +205,29 @@
     background: #29323a;
     color: var(--text);
     font: inherit;
+    cursor: pointer;
   }
   dialog button.primary { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
-  #cfgError { color: var(--red); font-size: .9rem; min-height: 1.2em; margin-top: 8px; }
+  dialog button.danger { background: transparent; border-color: #5a2a27; color: var(--red); margin-right: auto; }
+  .err { color: var(--red); font-size: .9rem; min-height: 1.2em; margin-top: 8px; }
+  .hint { color: var(--muted); font-size: .85rem; margin-top: 6px; }
+  #dayList { max-height: 50vh; overflow-y: auto; }
+  .shiftRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #2c353d;
+  }
+  .shiftRow .t { font-size: 1.05rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .shiftRow .m { color: var(--muted); font-size: .85rem; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); padding: 8px 0; }
+  .totalRow { padding-top: 10px; color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
+
 <main id="viewTrack" class="view active" role="tabpanel" aria-labelledby="tabTrack">
   <div id="status"></div>
   <button id="btn" type="button"></button>
@@ -168,6 +237,15 @@
 
 <section id="viewStats" class="view" role="tabpanel" aria-labelledby="tabStats">
   <div id="stats" aria-label="Статистика"></div>
+  <div id="calCard">
+    <div id="calHead">
+      <button id="calPrev" type="button" aria-label="Попередній місяць">‹</button>
+      <div id="calTitle"></div>
+      <button id="calNext" type="button" aria-label="Наступний місяць">›</button>
+    </div>
+    <div id="calGrid"></div>
+    <div id="calSummary"></div>
+  </div>
   <button id="settingsBtn" type="button">Налаштування</button>
 </section>
 
@@ -182,15 +260,42 @@
 </nav>
 
 <dialog id="dlg">
-  <h2>Підключення до таблиці</h2>
+  <h2>Налаштування</h2>
   <label for="cfgUrl">Адреса веб-застосунку (…/exec)</label>
   <input id="cfgUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
   <label for="cfgToken">Токен</label>
   <input id="cfgToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
-  <div id="cfgError"></div>
+  <label for="cfgRate">Вартість робочої години, ₴</label>
+  <input id="cfgRate" type="text" inputmode="decimal" autocomplete="off" placeholder="наприклад, 150">
+  <div class="hint">Ставка зберігається лише на цьому телефоні. Суми в статистиці рахуються за поточною ставкою.</div>
+  <div id="cfgError" class="err"></div>
   <div class="row">
     <button id="cfgCancel" type="button">Скасувати</button>
     <button id="cfgSave" type="button" class="primary">Зберегти</button>
+  </div>
+</dialog>
+
+<dialog id="dayDlg">
+  <h2 id="dayTitle"></h2>
+  <div id="dayList"></div>
+  <div class="row">
+    <button id="dayAdd" type="button">Додати зміну</button>
+    <button id="dayClose" type="button" class="primary">Закрити</button>
+  </div>
+</dialog>
+
+<dialog id="editDlg">
+  <h2 id="editTitle"></h2>
+  <label for="editStart">Початок</label>
+  <input id="editStart" type="datetime-local">
+  <label for="editEnd">Кінець</label>
+  <input id="editEnd" type="datetime-local">
+  <div id="editHint" class="hint"></div>
+  <div id="editError" class="err"></div>
+  <div class="row">
+    <button id="editDelete" type="button" class="danger">Видалити</button>
+    <button id="editCancel" type="button">Скасувати</button>
+    <button id="editSave" type="button" class="primary">Зберегти</button>
   </div>
 </dialog>
 
@@ -198,24 +303,33 @@
 (function () {
   'use strict';
 
-  const LS = { cfg: 'wt_cfg', state: 'wt_state', queue: 'wt_queue', shifts: 'wt_shifts' };
+  const LS = { cfg: 'wt_cfg', queue: 'wt_queue', shifts: 'wt_shifts2', oldShifts: 'wt_shifts' };
   const $ = id => document.getElementById(id);
-  const btn = $('btn'), statusEl = $('status'), timerEl = $('timer'), statsEl = $('stats');
-  const syncEl = $('sync'), noteEl = $('note'), dlg = $('dlg'), todayLineEl = $('todayLine');
+  const btn = $('btn'), statusEl = $('status'), timerEl = $('timer'), todayLineEl = $('todayLine');
+  const statsEl = $('stats'), syncEl = $('sync'), noteEl = $('note');
+  const calTitleEl = $('calTitle'), calGridEl = $('calGrid'), calSummaryEl = $('calSummary');
+  const dlg = $('dlg'), dayDlg = $('dayDlg'), editDlg = $('editDlg');
+  const FUTURE_MS = 5 * 60 * 1000; // така ж терпимість, як на сервері
 
   const NOTES = {
     already_open: 'У таблиці вже була відкрита зміна — перевір колонку «Кінець» у листі «Лог».',
     no_open_shift: 'У таблиці немає відкритої зміни, тому «Кінець» не записано. Перевір лист «Лог».',
     out_before_start: 'Час завершення раніше за початок — подію не записано. Перевір лист «Лог».',
     bad_time: 'Час події в майбутньому — подію не записано. Перевір годинник телефона.',
-    bad_event: 'Сервер відхилив подію як некоректну.'
+    bad_event: 'Сервер відхилив подію як некоректну.',
+    not_found: 'Зміну не знайдено в таблиці (можливо, її видалили) — правку не застосовано.'
   };
   const ERRORS = {
     auth: 'Невірний токен. Відкрий «Налаштування» і перевір його.',
     token_not_set: 'У Code.gs не змінено TOKEN.',
     bad_request: 'Сервер не зрозумів запит.'
   };
+  const MONTHS = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня',
+                  'вересня', 'жовтня', 'листопада', 'грудня'];
+  const MONTHS_NOM = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень',
+                      'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
 
+  // ---------- Допоміжне ----------
   function load(key, def) {
     try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? def : v; }
     catch (e) { return def; }
@@ -224,61 +338,81 @@
     try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* сховище недоступне */ }
   }
   const pad = n => String(n).padStart(2, '0');
-  function dayKey() {
-    const d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  function keyOf(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  // Тривалість у годинах і хвилинах (секунди відкидаються): 03:07
+  function hm(ms) {
+    const m = Math.floor(Math.max(0, ms) / 60000);
+    return pad(Math.floor(m / 60)) + ':' + pad(m % 60);
   }
-  function fmt(ms) {
-    const s = Math.max(0, Math.floor(ms / 1000));
-    return pad(Math.floor(s / 3600)) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60);
+  // Те саме, але без нуля попереду годин (для тісних клітинок календаря): 3:07
+  function hmShort(ms) {
+    const m = Math.floor(Math.max(0, ms) / 60000);
+    return Math.floor(m / 60) + ':' + pad(m % 60);
   }
-  function uuid() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
-  }
-
-  let cfg = load(LS.cfg, null);
-  let state = load(LS.state, { working: false, startedAt: null });
-  let queue = load(LS.queue, []);
-  let shifts = load(LS.shifts, []); // зміни з сервера: [{ s: початок_мс, e: кінець_мс | null }]
-  let syncing = false;
-  let lastTap = 0;
-
-  const MONTHS = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня',
-                  'вересня', 'жовтня', 'листопада', 'грудня'];
-  const MONTHS_NOM = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень',
-                      'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
-
-  function keyOf(d) {
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-  }
-  function hhmm(ms) {
-    const d = new Date(ms);
-    return pad(d.getHours()) + ':' + pad(d.getMinutes());
-  }
+  function clock(ms) { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function shortDate(ms) { const d = new Date(ms); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1); }
+  function toInput(ms) { return keyOf(new Date(ms)) + 'T' + clock(ms); }
+  function fromInput(str) { return new Date(str).getTime(); }
   function dayWord(n) {
     const a = n % 10, b = n % 100;
     if (a === 1 && b !== 11) return 'день';
     if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return 'дні';
     return 'днів';
   }
-
-  // Зміни з сервера + ще не відправлені події з черги (щоб офлайн-статистика була актуальною)
-  function currentShifts() {
-    const list = shifts.map(x => ({ s: x.s, e: x.e }));
-    let open = list.length && list[list.length - 1].e == null ? list[list.length - 1] : null;
-    queue.forEach(ev => {
-      if (ev.type === 'in') {
-        if (!open) { open = { s: ev.ts, e: null }; list.push(open); }
-      } else if (open && ev.ts >= open.s) {
-        open.e = ev.ts;
-        open = null;
-      }
-    });
-    return list;
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
+  function rateNow() { return cfg && cfg.rate > 0 ? cfg.rate : 0; }
+  function money(ms) {
+    const v = Math.round(ms / 3600000 * rateNow() * 100) / 100;
+    return v.toLocaleString('uk-UA', { maximumFractionDigits: 2 }) + ' ₴';
   }
 
-  function computeStats() {
+  // ---------- Дані ----------
+  let cfg = load(LS.cfg, null);
+  let queue = load(LS.queue, []);
+  // зміни з сервера: [{ id, s: початок_мс, e: кінець_мс | null }]
+  let shifts = load(LS.shifts, null);
+  if (!shifts) shifts = load(LS.oldShifts, []).map(x => ({ id: null, s: x.s, e: x.e }));
+  let syncing = false;
+  let lastTap = 0;
+  let view = { working: false, startedAt: null };
+  let lastMin = Math.floor(Date.now() / 60000);
+  const now0 = new Date();
+  const cal = { y: now0.getFullYear(), m: now0.getMonth() };
+
+  // Зміни з сервера + ще не відправлені події з черги: офлайн-статистика й календар
+  // одразу враховують нові приходи, уходи та правки.
+  function currentShifts() {
+    const list = shifts.map(x => ({ id: x.id, s: x.s, e: x.e }));
+    const findOpen = () => list.filter(x => x.e == null).pop();
+    queue.forEach(ev => {
+      if (ev.type === 'in') {
+        if (!findOpen()) list.push({ id: ev.id, s: ev.ts, e: null });
+      } else if (ev.type === 'out') {
+        const o = findOpen();
+        if (o && ev.ts >= o.s) o.e = ev.ts;
+      } else if (ev.type === 'add') {
+        list.push({ id: ev.id, s: ev.s, e: ev.e });
+      } else if (ev.type === 'edit') {
+        const t = list.find(x => x.id === ev.sid);
+        if (t) { t.s = ev.s; if (ev.e != null) t.e = ev.e; }
+      } else if (ev.type === 'del') {
+        const i = list.findIndex(x => x.id === ev.sid);
+        if (i >= 0) list.splice(i, 1);
+      }
+    });
+    list.sort((a, b) => a.s - b.s);
+    return list;
+  }
+  function stateOf(list) {
+    const open = list.filter(x => x.e == null).pop();
+    return open ? { working: true, startedAt: open.s } : { working: false, startedAt: null };
+  }
+
+  // ---------- Статистика за періоди ----------
+  function computeStats(list) {
     const now = new Date();
     const nowMs = now.getTime();
     const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
@@ -298,7 +432,7 @@
     periods.push({ id: 'month', label: MONTHS_NOM[m], hint: String(y), from: mk(1), to: mk(lastDay) });
     periods.forEach(p => { p.ms = 0; p.days = new Set(); });
 
-    currentShifts().forEach(sh => {
+    list.forEach(sh => {
       const key = keyOf(new Date(sh.s)); // зміна належить дню, коли вона почалась
       const dur = Math.max(0, (sh.e == null ? nowMs : sh.e) - sh.s);
       periods.forEach(p => {
@@ -308,32 +442,91 @@
     return periods;
   }
 
-  function renderStats() {
-    const periods = computeStats();
-    todayLineEl.textContent = 'Сьогодні: ' + fmt(periods[0].ms);
+  function renderStats(list) {
+    const periods = computeStats(list);
+    todayLineEl.textContent = 'Сьогодні: ' + hm(periods[0].ms) + (rateNow() ? ' · ' + money(periods[0].ms) : '');
     statsEl.innerHTML = periods.map(p =>
       '<div class="row' + (p.id === 'today' ? ' main' : '') + '">' +
         '<div class="lbl">' + p.label + (p.hint ? '<small>' + p.hint + '</small>' : '') + '</div>' +
-        '<div class="val">' + fmt(p.ms) + '</div>' +
+        '<div class="val">' + hm(p.ms) + (rateNow() ? '<small>' + money(p.ms) + '</small>' : '') + '</div>' +
         '<div class="days">' + p.days.size + ' ' + dayWord(p.days.size) + '</div>' +
       '</div>'
     ).join('');
   }
 
-  // ---------- Відображення ----------
-  function render() {
-    btn.classList.toggle('working', state.working);
-    btn.textContent = state.working ? 'Піти з роботи' : 'Прийшов на роботу';
-    statusEl.textContent = state.working && state.startedAt
-      ? 'Ти на роботі з ' + hhmm(state.startedAt)
-      : (state.working ? 'Ти на роботі' : 'Ти не на роботі');
-    renderStats();
-    renderTimer();
-    renderSync();
+  // ---------- Календар ----------
+  function renderCalendar(list) {
+    const nowD = new Date(), nowMs = nowD.getTime();
+    const first = new Date(cal.y, cal.m, 1);
+    const lastDay = new Date(cal.y, cal.m + 1, 0).getDate();
+    const lead = (first.getDay() + 6) % 7;
+    const todayKey = keyOf(nowD);
+
+    const perDay = {};
+    list.forEach(sh => {
+      const d = new Date(sh.s);
+      if (d.getFullYear() !== cal.y || d.getMonth() !== cal.m) return;
+      const k = keyOf(d);
+      const o = perDay[k] || (perDay[k] = { ms: 0, open: false });
+      o.ms += Math.max(0, (sh.e == null ? nowMs : sh.e) - sh.s);
+      if (sh.e == null) o.open = true;
+    });
+
+    let html = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map(w => '<div class="wd">' + w + '</div>').join('');
+    for (let i = 0; i < lead; i++) html += '<div class="day blank"></div>';
+    let total = 0, days = 0;
+    for (let day = 1; day <= lastDay; day++) {
+      const key = cal.y + '-' + pad(cal.m + 1) + '-' + pad(day);
+      const o = perDay[key];
+      let style = '', label = '';
+      if (o) {
+        total += o.ms;
+        days++;
+        const alpha = o.open ? 0.5 : Math.min(1, o.ms / 3600000 / 8) * 0.5 + 0.15;
+        style = ' style="background:' + (o.open ? 'rgba(229,72,63,' : 'rgba(47,179,106,') + alpha.toFixed(2) + ')"';
+        label = hmShort(o.ms);
+      }
+      html += '<button type="button" class="day' + (key === todayKey ? ' today' : '') +
+        '" data-key="' + key + '"' + style + '><span class="n">' + day + '</span><span class="h">' + label + '</span></button>';
+    }
+    calGridEl.innerHTML = html;
+    calTitleEl.textContent = MONTHS_NOM[cal.m] + ' ' + cal.y;
+    calSummaryEl.textContent = days
+      ? 'Разом: ' + hmShort(total) + ' · ' + days + ' ' + dayWord(days) + (rateNow() ? ' · ' + money(total) : '')
+      : 'У цьому місяці змін немає';
+
+    const earliest = list.length ? Math.min.apply(null, list.map(x => x.s)) : Infinity;
+    $('calPrev').disabled = !(earliest < first.getTime());
+    $('calNext').disabled = (cal.y * 12 + cal.m) >= (nowD.getFullYear() * 12 + nowD.getMonth());
   }
-  function renderTimer() {
-    timerEl.textContent = state.working && state.startedAt ? fmt(Date.now() - state.startedAt) : '';
-    if (state.working) renderStats(); // поточна зміна «тікає» в статистиці
+  $('calPrev').addEventListener('click', () => {
+    cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; }
+    renderCalendar(currentShifts());
+  });
+  $('calNext').addEventListener('click', () => {
+    cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; }
+    renderCalendar(currentShifts());
+  });
+  calGridEl.addEventListener('click', ev => {
+    const b = ev.target.closest('.day[data-key]');
+    if (b) openDay(b.dataset.key);
+  });
+
+  // ---------- Головне відображення ----------
+  function render() {
+    const list = currentShifts();
+    view = stateOf(list);
+    btn.classList.toggle('working', view.working);
+    btn.textContent = view.working ? 'Піти з роботи' : 'Прийшов на роботу';
+    statusEl.textContent = view.working ? 'Ти на роботі з ' + clock(view.startedAt) : 'Ти не на роботі';
+    renderStats(list);
+    renderCalendar(list);
+    setTimer();
+    renderSync();
+    if (dayDlg.open) renderDay(list);
+  }
+  function setTimer() {
+    timerEl.textContent = view.working && view.startedAt ? hm(Date.now() - view.startedAt) : '';
   }
   function renderSync() {
     let text, pending = false;
@@ -382,10 +575,10 @@
   }
 
   function applyServer(s) {
-    if (queue.length) return; // є непереслані дії — локальний стан важливіший
-    state = { working: !!s.working, startedAt: s.startedAt || null };
-    shifts = (s.shifts || []).map(x => ({ s: x[0], e: x[1] || null }));
-    save(LS.state, state);
+    if (queue.length) return; // є непереслані дії — локальні дані важливіші
+    shifts = (s.shifts || []).map(x => x.length === 2
+      ? { id: null, s: x[0], e: x[1] || null }          // відповідь старого сервера
+      : { id: x[0], s: x[1], e: x[2] || null });
     save(LS.shifts, shifts);
     render();
   }
@@ -398,7 +591,7 @@
     try {
       while (queue.length) {
         const ev = queue[0];
-        const data = await post({ action: 'event', id: ev.id, type: ev.type, ts: ev.ts });
+        const data = await post(Object.assign({ action: 'event' }, ev));
         queue.shift();
         save(LS.queue, queue);
         if (NOTES[data.result]) note(NOTES[data.result], false);
@@ -416,7 +609,15 @@
     }
   }
 
-  // ---------- Дії ----------
+  function commit(ev) {
+    queue.push(ev);
+    save(LS.queue, queue);
+    note('');
+    render();
+    sync();
+  }
+
+  // ---------- Кнопка ----------
   btn.addEventListener('click', () => {
     if (!cfg) { openSettings(); return; }
     const now = Date.now();
@@ -425,19 +626,7 @@
     btn.disabled = true;
     setTimeout(() => { btn.disabled = false; }, 2000);
     if (navigator.vibrate) navigator.vibrate(40);
-
-    const ev = { id: uuid(), type: state.working ? 'out' : 'in', ts: now };
-    if (ev.type === 'in') {
-      state = { working: true, startedAt: now };
-    } else {
-      state = { working: false, startedAt: null };
-    }
-    queue.push(ev);
-    save(LS.queue, queue);
-    save(LS.state, state);
-    note('');
-    render();
-    sync();
+    commit({ id: uuid(), type: view.working ? 'out' : 'in', ts: now });
   });
 
   // ---------- Вкладки ----------
@@ -451,10 +640,128 @@
   $('tabTrack').addEventListener('click', () => showTab('track'));
   $('tabStats').addEventListener('click', () => showTab('stats'));
 
+  // ---------- День: список змін ----------
+  let daySel = null;
+  let dayShifts = [];
+
+  function openDay(key) {
+    daySel = key;
+    renderDay(currentShifts());
+    dayDlg.showModal();
+  }
+  function renderDay(list) {
+    const p = daySel.split('-').map(Number);
+    const d = new Date(p[0], p[1] - 1, p[2]);
+    $('dayTitle').textContent = d.toLocaleDateString('uk-UA', { weekday: 'long', day: 'numeric', month: 'long' });
+    dayShifts = list.filter(x => keyOf(new Date(x.s)) === daySel);
+    if (!dayShifts.length) {
+      $('dayList').innerHTML = '<div class="empty">Змін немає</div>';
+      return;
+    }
+    const nowMs = Date.now();
+    let total = 0;
+    let html = dayShifts.map((x, i) => {
+      const dur = Math.max(0, (x.e == null ? nowMs : x.e) - x.s);
+      total += dur;
+      const end = x.e == null ? '…' : clock(x.e) + (keyOf(new Date(x.e)) !== daySel ? ' (' + shortDate(x.e) + ')' : '');
+      return '<div class="shiftRow"><div>' +
+        '<div class="t">' + clock(x.s) + ' – ' + end + '</div>' +
+        '<div class="m">' + hm(dur) + (x.e == null ? ' · триває' : '') + (rateNow() ? ' · ' + money(dur) : '') + '</div>' +
+        '</div><button type="button" class="editBtn" data-idx="' + i + '">Змінити</button></div>';
+    }).join('');
+    if (dayShifts.length > 1) {
+      html += '<div class="totalRow">Разом за день: ' + hm(total) + (rateNow() ? ' · ' + money(total) : '') + '</div>';
+    }
+    $('dayList').innerHTML = html;
+  }
+  $('dayList').addEventListener('click', ev => {
+    const b = ev.target.closest('.editBtn');
+    if (b) openEdit('edit', dayShifts[Number(b.dataset.idx)]);
+  });
+  $('dayAdd').addEventListener('click', () => openEdit('add', null));
+  $('dayClose').addEventListener('click', () => dayDlg.close());
+
+  // ---------- Правка / додавання зміни ----------
+  let editCtx = null;
+
+  function openEdit(mode, shift) {
+    if (!cfg) { openSettings(); return; }
+    $('editError').textContent = '';
+    if (mode === 'add') {
+      const p = daySel.split('-').map(Number);
+      const nowMs = Date.now();
+      let e = new Date(p[0], p[1] - 1, p[2], 18, 0).getTime();
+      if (e > nowMs) e = Math.floor(nowMs / 60000) * 60000;
+      let s = new Date(p[0], p[1] - 1, p[2], 9, 0).getTime();
+      if (s >= e) s = e - 3600000;
+      editCtx = { mode: 'add', shift: null };
+      $('editTitle').textContent = 'Нова зміна';
+      $('editStart').value = toInput(s);
+      $('editEnd').value = toInput(e);
+      $('editHint').textContent = '';
+      $('editDelete').hidden = true;
+    } else {
+      if (!shift || !shift.id) {
+        note('Цю зміну ще не синхронізовано з таблицею. Спробуй після синхронізації.', false);
+        return;
+      }
+      editCtx = { mode: 'edit', shift: shift };
+      $('editTitle').textContent = 'Змінити зміну';
+      $('editStart').value = toInput(shift.s);
+      $('editEnd').value = shift.e == null ? '' : toInput(shift.e);
+      $('editHint').textContent = shift.e == null
+        ? 'Зміна ще триває. Вкажи «Кінець», щоб закрити її, або залиш порожнім.'
+        : '';
+      $('editDelete').hidden = false;
+    }
+    editDlg.showModal();
+  }
+
+  $('editCancel').addEventListener('click', () => editDlg.close());
+
+  $('editSave').addEventListener('click', () => {
+    const fail = msg => { $('editError').textContent = msg; };
+    const s = fromInput($('editStart').value);
+    const eRaw = $('editEnd').value;
+    const e = eRaw ? fromInput(eRaw) : null;
+    const nowMs = Date.now();
+    const limit = nowMs + FUTURE_MS;
+    const isOpenShift = editCtx.mode === 'edit' && editCtx.shift.e == null;
+
+    if (!isFinite(s)) return fail('Вкажи час початку.');
+    if (e === null && !isOpenShift) return fail('Вкажи час завершення.');
+    if (e !== null && !isFinite(e)) return fail('Некоректний час завершення.');
+    if (e !== null && e <= s) return fail('Завершення має бути пізніше за початок.');
+    if (s > limit || (e !== null && e > limit)) return fail('Час не може бути в майбутньому.');
+
+    const ignore = editCtx.mode === 'edit' ? editCtx.shift.id : undefined;
+    const endEff = e === null ? Math.max(nowMs, s + 1) : e;
+    const clash = currentShifts().find(x =>
+      x.id !== ignore && s < (x.e == null ? nowMs : x.e) && endEff > x.s);
+    if (clash) {
+      return fail('Перетинається зі зміною ' + clock(clash.s) + ' – ' +
+        (clash.e == null ? '…' : clock(clash.e)) + ' (' + shortDate(clash.s) + ').');
+    }
+
+    const dur = endEff - s;
+    if (dur > 16 * 3600000 && !window.confirm('Тривалість зміни ' + hm(dur) + '. Зберегти?')) return;
+
+    editDlg.close();
+    if (editCtx.mode === 'add') commit({ id: uuid(), type: 'add', s: s, e: e });
+    else commit({ id: uuid(), type: 'edit', sid: editCtx.shift.id, s: s, e: e });
+  });
+
+  $('editDelete').addEventListener('click', () => {
+    if (!window.confirm('Видалити цю зміну?')) return;
+    editDlg.close();
+    commit({ id: uuid(), type: 'del', sid: editCtx.shift.id });
+  });
+
   // ---------- Налаштування ----------
   function openSettings() {
     $('cfgUrl').value = cfg ? cfg.url : '';
     $('cfgToken').value = cfg ? cfg.token : '';
+    $('cfgRate').value = cfg && cfg.rate ? String(cfg.rate) : '';
     $('cfgError').textContent = '';
     dlg.showModal();
   }
@@ -463,12 +770,15 @@
   $('cfgSave').addEventListener('click', () => {
     const url = $('cfgUrl').value.trim();
     const token = $('cfgToken').value.trim();
+    const rateRaw = $('cfgRate').value.trim().replace(',', '.');
+    const rate = rateRaw === '' ? 0 : Number(rateRaw);
     if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)) {
       $('cfgError').textContent = 'Адреса має мати вигляд https://script.google.com/macros/s/…/exec';
       return;
     }
     if (!token) { $('cfgError').textContent = 'Введи токен.'; return; }
-    cfg = { url: url, token: token };
+    if (!isFinite(rate) || rate < 0) { $('cfgError').textContent = 'Вартість години має бути числом, наприклад 150 або 150.50.'; return; }
+    cfg = { url: url, token: token, rate: rate };
     save(LS.cfg, cfg);
     note('');
     dlg.close();
@@ -482,7 +792,11 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') { render(); sync(); }
   });
-  setInterval(renderTimer, 1000);
+  setInterval(() => {
+    setTimer();
+    const mk = Math.floor(Date.now() / 60000);
+    if (mk !== lastMin) { lastMin = mk; render(); } // раз на хвилину оновлюємо цифри (і дату опівночі)
+  }, 1000);
   setInterval(() => { if (queue.length) sync(); }, 30000);
 
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
